@@ -66,11 +66,51 @@ def attack_dtls_replay():
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # Replay behavior: burst of identical captured handshake packets in rapid succession
-        # Simulates replaying a valid DTLS ClientHello to hijack sequence numbers
         captured_handshake = b"DTLS_REPLAY_SEQ\x00\x01" * 40  # ~680 bytes, sent rapidly
         for _ in range(5):
             sock.sendto(captured_handshake, (SERVER_IP, DTLS_PORT))
             time.sleep(0.01)  # Rapid burst - key signature of replay
+        sock.close()
+    except Exception:
+        pass
+
+def attack_exfiltration():
+    print("[ATTACK] Running Data Exfiltration (MTU-Sized Data Chunk)...")
+    context = get_tls_context()
+    try:
+        with socket.create_connection((SERVER_IP, TLS_PORT)) as sock:
+            with context.wrap_socket(sock, server_hostname='iot_server') as tls_sock:
+                # Exfiltration behavior: Sending a large 1500-byte block (MTU limit)
+                # This is not normal traffic (<100) and not a known attack size.
+                payload = b"EXFILTRATION_DATA_BLOCK_" + b"X" * 1475
+                tls_sock.sendall(payload)
+                tls_sock.recv(1024)
+        time.sleep(0.05)
+    except Exception:
+        pass
+
+def attack_malformed_control():
+    print("[ATTACK] Running Malformed Control Packet Attack...")
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Malformed Control behavior: 1200-byte "management" packet (anomaly)
+        payload = b"CONTROL_CMD_MALFORMED" + b"0" * 1180
+        sock.sendto(payload, (SERVER_IP, DTLS_PORT))
+        time.sleep(0.05)
+        sock.close()
+    except Exception:
+        pass
+
+
+
+def attack_random_payload():
+    print("[ATTACK] Running Random Payload Attack (Novel Anomaly)...")
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Random behavior: 2500-byte payload (never seen in training as a specific attack)
+        payload = b"RANDOM_ANOMALY_" + b"Z" * 2480
+        sock.sendto(payload, (SERVER_IP, DTLS_PORT))
+        time.sleep(0.05)
         sock.close()
     except Exception:
         pass
@@ -81,8 +121,12 @@ def generate_attack_data(iterations, min_delay, max_delay, specific_attack=None)
         'tls_heartbleed': attack_tls_heartbleed,
         'dtls_amp': attack_dtls_amplification,
         'tls_poodle': attack_tls_poodle,
-        'dtls_replay': attack_dtls_replay
+        'dtls_replay': attack_dtls_replay,
+        'exfiltration': attack_exfiltration,
+        'malformed_control': attack_malformed_control,
+        'random_payload': attack_random_payload
     }
+
     
     print(f"Starting automated attack data generation ({iterations} iterations)...")
     for i in range(iterations):
@@ -104,7 +148,7 @@ def generate_attack_data(iterations, min_delay, max_delay, specific_attack=None)
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Simulate Attacks for ML Data Generation")
     parser.add_argument('--loop', type=int, default=1, help='Number of attack sequences to run')
-    parser.add_argument('--attack', type=str, choices=['random', 'tls_heartbleed', 'dtls_amp', 'tls_poodle', 'dtls_replay'],
+    parser.add_argument('--attack', type=str, choices=['random', 'tls_heartbleed', 'dtls_amp', 'tls_poodle', 'dtls_replay', 'exfiltration', 'malformed_control', 'random_payload'],
                         default='random', help='Run a specific attack, or random attacks')
     parser.add_argument('--min-interval', type=float, default=1.0, help='Minimum random delay between scripts (seconds)')
     parser.add_argument('--max-interval', type=float, default=8.0, help='Maximum random delay between scripts (seconds)')

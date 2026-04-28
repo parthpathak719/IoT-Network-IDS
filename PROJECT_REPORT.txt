@@ -1,0 +1,81 @@
+================================================================================
+          PROJECT REPORT: AI-DRIVEN IOT INTRUSION DETECTION SYSTEM (IDS)
+================================================================================
+
+1. PROJECT OBJECTIVE
+--------------------------------------------------------------------------------
+The goal of this project is to develop a robust, real-time Security Monitoring 
+System for IoT devices. The system is designed to "memorize" normal network 
+traffic patterns and detect both known cyber-attacks and novel (Zero-Day) 
+anomalies using a Hybrid Deep Learning approach.
+
+2. SYSTEM ARCHITECTURE
+--------------------------------------------------------------------------------
+The system is divided into three primary layers:
+
+A. SENSOR LAYER (Simulated IoT Devices):
+   - Python-based simulators (iot_client.py) emulate legitimate IoT traffic.
+   - Attack simulators (attacker_sim.py) generate malicious traffic, including:
+     * TLS Heartbleed (Memory exhaustion simulation)
+     * TLS POODLE (Downgrade/Padding attack simulation)
+     * DTLS Amplification (DDoS simulation)
+     * DTLS Replay (Unauthorized command repetition)
+     * Novel Exfiltration (Large, randomized payloads to trigger "Unknown" alerts)
+
+B. SERVER LAYER (IDS Engine):
+   - A multi-protocol server (iot_server.py) that listens on TCP (TLS) and 
+     UDP (DTLS) ports.
+   - Every incoming packet is analyzed in real-time by the ML/DL model before 
+     being processed.
+   - Real-time alerts are issued for any detected threat.
+
+C. VISUALIZATION LAYER (Dashboard):
+   - A Flask-based web dashboard (dashboard.py) provides a live view of:
+     * Total traffic vs. Anomaly rate.
+     * Real-time packet timeline.
+     * Categorical breakdown of detected attacks.
+     * Recent packet log with security status badges.
+
+3. ARTIFICIAL INTELLIGENCE MODEL
+--------------------------------------------------------------------------------
+The system utilizes a Hybrid AI architecture located in 'dl_autoencoder.py':
+
+- Tier 1: Isolation Forest (Normal Pattern Memorizer)
+  - This model is trained exclusively on "clean" traffic. 
+  - It creates a strict "Normal" profile. Anything that deviates is flagged 
+    as an outlier.
+
+- Tier 2: Deep Learning MLP (Multi-Layer Perceptron)
+  - A Neural Network with layers (128, 64, 32) trained on specific attack 
+    signatures.
+  - It handles multi-class classification to identify exactly WHICH attack 
+    is happening.
+
+- Tier 3: High-Confidence Thresholding
+  - To prevent False Positives, the system only labels a known attack if the 
+    Neural Network is >99.99% confident. 
+  - If the packet is an outlier but confidence is low, it is classified as 
+    an "Unknown Anomaly."
+
+4. SIMULATION METHODOLOGY
+--------------------------------------------------------------------------------
+The project simulates a real-world environment using:
+1. Virtual Network: Local socket communication between clients and the server.
+2. Data Logging: Every interaction is logged to 'traffic_log.csv' with 
+   high-resolution timestamps.
+3. Class Balancing: Because attacks are rare in real life, the training 
+   pipeline uses oversampling (30x) to ensure the AI doesn't ignore the 
+   malicious patterns.
+
+5. HOW TO RUN THE PROJECT
+--------------------------------------------------------------------------------
+1. Start the Server:    python iot_server.py
+2. Start the Dashboard: python dashboard.py (View at http://localhost:5050)
+3. Run Normal Traffic:  python iot_client.py
+4. Run Attacks:         python attacker_sim.py
+5. Generate Report:     python threat_report.py
+
+================================================================================
+Generated on: 2026-04-28
+Status: Fully Operational
+================================================================================
