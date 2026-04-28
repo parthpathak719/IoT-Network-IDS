@@ -40,6 +40,12 @@ def generate_report():
         print("Error: traffic_log.csv is empty.")
         return
 
+    # --- DATA SANITATION ---
+    # Ensure anomaly_score is numeric, replace NaN (malformed rows) with 1 (Normal)
+    df['anomaly_score'] = pd.to_numeric(df['anomaly_score'], errors='coerce').fillna(1)
+    df['payload_size'] = pd.to_numeric(df['payload_size'], errors='coerce').fillna(0)
+    # -----------------------
+
     df = df.sort_values('timestamp')
     df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
 
@@ -76,22 +82,22 @@ def generate_report():
     tls_attacks = len(df[(df['anomaly_score'] < 0) & (df['protocol'] == 'TLS')])
     dtls_attacks = len(df[(df['anomaly_score'] < 0) & (df['protocol'] == 'DTLS')])
 
-    # ── Write TXT ──────────────────────────────────────────────────────────────
+    # --- Write TXT ---
     with open(REPORT_TXT, 'w', encoding='utf-8') as f:
-        f.write("╔══════════════════════════════════════════════════════════════╗\n")
-        f.write("║              IoT NETWORK THREAT REPORT                       ║\n")
-        f.write(f"║              Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}                  ║\n")
-        f.write("╚══════════════════════════════════════════════════════════════╝\n\n")
+        f.write("================================================================\n")
+        f.write("              IoT NETWORK THREAT REPORT\n")
+        f.write(f"              Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write("================================================================\n\n")
 
         f.write("OVERVIEW\n")
-        f.write("─" * 64 + "\n")
+        f.write("-" * 64 + "\n")
         f.write(f"Total Packets Analyzed  : {total}\n")
         f.write(f"Normal Traffic          : {normal_count}  ({normal_count/total*100:.1f}%)\n")
         f.write(f"Total Anomalies         : {anomaly_count}   ({anomaly_count/total*100:.1f}%)\n")
         f.write(f"Monitoring Duration     : {duration_str}  (hh:mm:ss)\n\n")
 
         f.write("ATTACK BREAKDOWN\n")
-        f.write("─" * 64 + "\n")
+        f.write("-" * 64 + "\n")
         for name, count in attack_counts.items():
             protocol = "TLS " if name.startswith("TLS") else "DTLS"
             pct = f"{count/anomaly_count*100:.1f}%" if anomaly_count > 0 else "0.0%"
@@ -99,21 +105,21 @@ def generate_report():
             f.write(f"{protocol} | {label:<28}: {count} packets  ({pct} of attacks)\n")
 
         f.write("\nPEAK ATTACK WINDOW\n")
-        f.write("─" * 64 + "\n")
+        f.write("-" * 64 + "\n")
         if peak_window_start:
-            f.write(f"Highest Activity  : {peak_window_start} → {peak_window_end}\n")
-            f.write(f"Packets in window : {peak_count}  ({peak_count/anomaly_count*100:.1f}% of all attacks)\n")
+            f.write(f"Highest Activity  : {peak_window_start} -> {peak_window_end}\n")
+            f.write(f"Attack Frequency  : {peak_count} packets / min\n")
         else:
-            f.write("No attacks detected in log.\n")
+            f.write("No major attack peaks detected.\n")
 
-        f.write("\nPROTOCOL RISK SUMMARY\n")
-        f.write("─" * 64 + "\n")
-        f.write(f"TLS  Risk Level  : {get_risk(tls_attacks):<6}  ({tls_attacks} anomalies)\n")
-        f.write(f"DTLS Risk Level  : {get_risk(dtls_attacks):<6}  ({dtls_attacks} anomalies)\n\n")
-
-        status = "⚠  THREATS DETECTED — REVIEW RECOMMENDED" if anomaly_count > 0 else "✔  ALL CLEAR — NO THREATS DETECTED"
+        f.write("\nSECURITY RISK ASSESSMENT\n")
+        f.write("-" * 64 + "\n")
+        f.write(f"TLS Vulnerabilities  : {tls_attacks} events\n")
+        f.write(f"DTLS Vulnerabilities : {dtls_attacks} events\n")
+        
+        status = "THREATS DETECTED — REVIEW RECOMMENDED" if anomaly_count > 0 else "ALL CLEAR — NO THREATS DETECTED"
         f.write(f"STATUS: {status}\n")
-        f.write("═" * 64 + "\n")
+        f.write("-" * 64 + "\n")
 
     # ── Write CSV ──────────────────────────────────────────────────────────────
     with open(REPORT_CSV, 'w', newline='') as f:
@@ -135,8 +141,8 @@ def generate_report():
     print(f"  -> {REPORT_TXT}")
     print(f"  -> {REPORT_CSV}")
 
-    # Print summary to console too
-    with open(REPORT_TXT, 'r', encoding='utf-8') as f:
+    print("\n" + "="*30 + " REPORT SUMMARY " + "="*30)
+    with open(REPORT_TXT, 'r', encoding='utf-8', errors='replace') as f:
         print(f.read())
 
 if __name__ == "__main__":

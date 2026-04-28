@@ -13,7 +13,11 @@ def train_model():
         return
 
     print("Loading data...")
-    df = pd.read_csv(LOG_FILE)
+    try:
+        df = pd.read_csv(LOG_FILE)
+    except UnicodeDecodeError:
+        # Fallback for files saved in UTF-16 (Unicode) format
+        df = pd.read_csv(LOG_FILE, encoding='utf-16')
     
     if len(df) < 10:
         print("Warning: Very little data collected. The model might not be accurate.")
@@ -36,18 +40,28 @@ def train_model():
     conditions = [
         df['payload_size'] >= 3000,                             # DTLS Amplification (-2)
         (df['payload_size'] >= 400) & (df['payload_size'] < 600),  # TLS Heartbleed (-3)
-        (df['payload_size'] >= 300) & (df['payload_size'] < 420),  # TLS POODLE (-4)
+        (df['payload_size'] >= 200) & (df['payload_size'] < 400),  # TLS POODLE (-4)
         (df['payload_size'] >= 600) & (df['payload_size'] < 800),  # DTLS Replay (-5)
         df['payload_size'] < 100                                # Normal (1)
     ]
     choices = [-2, -3, -4, -5, 1]
-    df['ground_truth'] = np.select(conditions, choices, default=1)
+    df['ground_truth'] = np.select(conditions, choices, default=-1)
     
     print(f"Training Multi-Class Deep Learning IDS on {len(features)} records...")
     
+    # --- FIX FOR IMBALANCED DATA (Heartbleed/POODLE) ---
+    # We oversample the attack classes so the model doesn't ignore them
+    df_attacks = df[df['ground_truth'] != 1]
+    df_normal = df[df['ground_truth'] == 1]
+    # Repeat attack data 30 times to give it more weight
+    df_balanced = pd.concat([df_normal] + [df_attacks]*30, ignore_index=True)
+    features_balanced = df_balanced[['payload_size', 'time_diff']]
+    labels_balanced = df_balanced['ground_truth']
+    # ---------------------------------------------------
+
     model = DeepLearningIDS()
-    # Train using both features and the exact labels to guarantee perfect convergence
-    model.fit(features, df['ground_truth'])
+    # Train using the balanced dataset
+    model.fit(features_balanced, labels_balanced)
     
     # Save the custom DL model so iot_server can load it
     joblib.dump(model, MODEL_FILE)
@@ -61,13 +75,17 @@ def train_model():
     
     acc = accuracy_score(df['ground_truth'], df['anomaly_predicted'])
     
-    print("\n================ DEEP LEARNING MODEL METRICS ================")
+    print("\n================ DEEP LEARNING HYBRID MODEL METRICS ================")
     print(f"Total Records Evaluated: {len(df)}")
     print(f"Normal Traffic Count:        {len(df[df['ground_truth'] == 1])}")
+    print(f"Unknown Anomalies (-1):      {len(df[df['anomaly_predicted'] == -1])}")
     print(f"DTLS Amp Attacks (-2):       {len(df[df['ground_truth'] == -2])}")
     print(f"TLS Heartbleed Attacks (-3): {len(df[df['ground_truth'] == -3])}")
     print(f"TLS POODLE Attacks (-4):     {len(df[df['ground_truth'] == -4])}")
     print(f"DTLS Replay Attacks (-5):    {len(df[df['ground_truth'] == -5])}")
+    print("-------------------------------------------------------------")
+    print("NOTE: The model now 'memorizes' the normal pattern using an Isolation Forest.")
+    print("Anything that deviates from normal but isn't a known attack is labeled '-1'.")
     print("-------------------------------------------------------------")
     print(f"Overall Accuracy:  {acc * 100:.2f}%")
     print("\nDetailed Classification Report:")

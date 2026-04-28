@@ -72,6 +72,9 @@ def check_anomaly(payload_size, proc_time, time_diff):
                     return -5
                 else:
                     return 1  # duplicate burst packet — ignore
+            elif prediction[0] == -1:
+                logging.warning(f"!!! UNKNOWN ANOMALY !!! - Traffic pattern deviates from normal memorized profile (Size: {payload_size} bytes)")
+                return -1
             return 1
         except Exception as e:
             return 0
@@ -80,7 +83,9 @@ def check_anomaly(payload_size, proc_time, time_diff):
 def log_traffic(protocol, payload_size, proc_time_ms, anomaly_score):
     with open(LOG_FILE, 'a', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow([time.time(), protocol, payload_size, proc_time_ms, anomaly_score])
+        # We write 7 columns to match the header:
+        # timestamp, protocol, payload_size, entropy, proc_time, anomaly_score, label
+        writer.writerow([time.time(), protocol, payload_size, 0.0, proc_time_ms, anomaly_score, anomaly_score])
 
 # --- TLS SERVER (TCP) ---
 def handle_tls_client(conn, addr):
@@ -97,7 +102,13 @@ def handle_tls_client(conn, addr):
             last_packet_time = now
             anomaly_score = check_anomaly(payload_size, proc_time_ms, time_diff)
             log_traffic('TLS', payload_size, proc_time_ms, anomaly_score)
-            conn.sendall(b"OK - TLS Data Received")
+            
+            if anomaly_score == -1:
+                conn.sendall(b"ALERT - Unknown Anomaly Detected")
+            elif anomaly_score < -1:
+                conn.sendall(b"ALERT - Known Attack Detected")
+            else:
+                conn.sendall(b"OK - TLS Data Received")
     except Exception as e:
         logging.error(f"TLS handler error from {addr}: {e}")
     finally:
@@ -138,7 +149,13 @@ def start_dtls_server():
                     last_packet_time = now
                     anomaly_score = check_anomaly(payload_size, proc_time_ms, time_diff)
                     log_traffic('DTLS', payload_size, proc_time_ms, anomaly_score)
-                    bindsocket.sendto(b"OK - DTLS Data Received", addr)
+                    
+                    if anomaly_score == -1:
+                        bindsocket.sendto(b"ALERT - Unknown Anomaly Detected", addr)
+                    elif anomaly_score < -1:
+                        bindsocket.sendto(b"ALERT - Known Attack Detected", addr)
+                    else:
+                        bindsocket.sendto(b"OK - DTLS Data Received", addr)
             except Exception as e:
                 pass
     except Exception as e:

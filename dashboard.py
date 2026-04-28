@@ -10,6 +10,7 @@ LOG_FILE = 'traffic_log.csv'
 ATTACK_LABELS = {
     0:  'Normal',
     1:  'Normal',
+    -1: 'Unknown Anomaly',
     -2: 'DTLS Amplification',
     -3: 'TLS Heartbleed',
     -4: 'TLS POODLE',
@@ -169,12 +170,13 @@ DASHBOARD_HTML = """
 
   <script>
     const ATTACK_NAMES = {
+      '-1': 'Unknown Anomaly',
       '-2': 'DTLS Amplification',
       '-3': 'TLS Heartbleed',
       '-4': 'TLS POODLE',
       '-5': 'DTLS Replay'
     };
-    const ATTACK_COLORS = ['#f85149','#d29922','#bc8cff','#58a6ff'];
+    const ATTACK_COLORS = ['#8b949e','#f85149','#d29922','#bc8cff','#58a6ff'];
 
     // Init charts
     const pieCtx = document.getElementById('pieChart').getContext('2d');
@@ -210,10 +212,10 @@ DASHBOARD_HTML = """
     const barChart = new Chart(barCtx, {
       type: 'bar',
       data: {
-        labels: ['DTLS Amp', 'TLS Heartbleed', 'TLS POODLE', 'DTLS Replay'],
+        labels: ['Unknown', 'DTLS Amp', 'TLS Heartbleed', 'TLS POODLE', 'DTLS Replay'],
         datasets: [{
           label: 'Count',
-          data: [0, 0, 0, 0],
+          data: [0, 0, 0, 0, 0],
           backgroundColor: ATTACK_COLORS,
           borderRadius: 4
         }]
@@ -259,7 +261,7 @@ DASHBOARD_HTML = """
         pieChart.update();
 
         // Bar chart
-        barChart.data.datasets[0].data = [d.dtls_amp, d.heartbleed, d.poodle, d.replay];
+        barChart.data.datasets[0].data = [d.unknown, d.dtls_amp, d.heartbleed, d.poodle, d.replay];
         barChart.update();
 
         // Line chart (rolling 10 buckets)
@@ -314,8 +316,25 @@ def api_data():
         df = pd.read_csv(LOG_FILE)
         if df.empty:
             return jsonify({'total': 0, 'normal': 0, 'anomaly': 0, 'attack_rate': '0.0',
-                            'dtls_amp': 0, 'heartbleed': 0, 'poodle': 0, 'replay': 0,
+                            'unknown': 0, 'dtls_amp': 0, 'heartbleed': 0, 'poodle': 0, 'replay': 0,
                             'timeline': [], 'recent': []})
+
+        # --- DATA SANITATION ---
+        # Ensure critical columns are numeric, handle malformed/NaN data from manual edits
+        df['anomaly_score'] = pd.to_numeric(df['anomaly_score'], errors='coerce')
+        df['payload_size'] = pd.to_numeric(df['payload_size'], errors='coerce').fillna(0)
+        df['timestamp'] = pd.to_numeric(df['timestamp'], errors='coerce').fillna(time.time())
+        df['processing_time_ms'] = pd.to_numeric(df['processing_time_ms'], errors='coerce').fillna(0)
+
+        # --- COLUMN SHIFT RECOVERY ---
+        # If anomaly_score is NaN but processing_time_ms looks like an attack code (-1 to -5), 
+        # it means the 5-column server bug shifted the data. We fix it here.
+        mask = df['anomaly_score'].isna() & df['processing_time_ms'].isin([-1, -2, -3, -4, -5])
+        df.loc[mask, 'anomaly_score'] = df.loc[mask, 'processing_time_ms']
+        
+        # Finally fill remaining NaNs with 1 (Normal)
+        df['anomaly_score'] = df['anomaly_score'].fillna(1)
+        # -----------------------------
 
         df = df.sort_values('timestamp')
 
@@ -325,6 +344,7 @@ def api_data():
         anomaly_count = len(anomaly_df)
         attack_rate = f"{anomaly_count / total * 100:.1f}" if total > 0 else "0.0"
 
+        unknown    = int(len(df[df['anomaly_score'] == -1]))
         dtls_amp   = int(len(df[df['anomaly_score'] == -2]))
         heartbleed = int(len(df[df['anomaly_score'] == -3]))
         poodle     = int(len(df[df['anomaly_score'] == -4]))
@@ -362,6 +382,7 @@ def api_data():
             'normal':      normal_count,
             'anomaly':     anomaly_count,
             'attack_rate': attack_rate,
+            'unknown':     unknown,
             'dtls_amp':    dtls_amp,
             'heartbleed':  heartbleed,
             'poodle':      poodle,
