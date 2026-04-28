@@ -93,7 +93,7 @@ python ml_anomaly_detector.py
 ```
 
 ### Step 7: Generate Threat Report
-**Terminal 3**:
+**Terminal 5**:
 ```bash
 python threat_report.py
 ```
