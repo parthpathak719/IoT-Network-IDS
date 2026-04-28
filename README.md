@@ -18,18 +18,19 @@ Instead of a simple "yes/no" anomaly detector, it is a **Multi-Class Classifier*
   - `-3` : TLS Heartbleed Attack
   - `-4` : TLS POODLE Attack
   - `-5` : DTLS Replay Attack
-
 ## Project Structure
-DS_Project/
-├── iot_server.py          # TLS/DTLS server with real-time ML detection
-├── iot_client.py          # Normal IoT traffic simulator
-├── attacker_sim.py        # Attack traffic generator (4 attack types)
-├── ml_anomaly_detector.py # Model training and evaluation
-├── dl_autoencoder.py      # MLP model class definition
-├── dashboard.py           # Real-time Flask dashboard
-├── threat_report.py       # Automated threat report generator
-├── certs/                 # TLS/DTLS certificates
-└── traffic_log.csv        # Auto-generated traffic log
+
+| File | Description |
+|------|-------------|
+| `iot_server.py` | TLS/DTLS server with real-time ML detection |
+| `iot_client.py` | Normal IoT traffic simulator |
+| `attacker_sim.py` | Attack traffic generator (4 attack types) |
+| `ml_anomaly_detector.py` | Model training and evaluation |
+| `dl_autoencoder.py` | MLP model class definition |
+| `dashboard.py` | Real-time Flask dashboard |
+| `threat_report.py` | Automated threat report generator |
+| `certs/` | TLS/DTLS SSL certificates |
+| `traffic_log.csv` | Auto-generated traffic log (created at runtime) |
 
 ## Attack Types Simulated
 | Attack | Protocol | Payload Size | Description |
