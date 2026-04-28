@@ -18,6 +18,7 @@ Instead of a simple "yes/no" anomaly detector, it is a **Multi-Class Classifier*
   - `-3` : TLS Heartbleed Attack
   - `-4` : TLS POODLE Attack
   - `-5` : DTLS Replay Attack
+
 ## Project Structure
 
 | File | Description |
@@ -40,6 +41,13 @@ Instead of a simple "yes/no" anomaly detector, it is a **Multi-Class Classifier*
 | Amplification | DTLS | ~4000 bytes | Massive UDP payload to overwhelm server |
 | Replay | DTLS | ~680 bytes | Captured handshake replayed to hijack sessions |
 
+## Dashboard Features
+- Live packet count, anomaly count, and attack rate
+- Donut chart — normal vs anomaly traffic ratio
+- Line chart — packets over time
+- Bar chart — breakdown by attack type
+- Live packet table with last 20 entries (auto-refreshes every 3 seconds)
+
 ## Usage Instructions
 
 ### Prerequisites
@@ -53,59 +61,40 @@ Always start fresh before a new run:
 del traffic_log.csv        # Windows
 rm traffic_log.csv         # Linux/Mac
 ```
-The server will auto-recreate it with proper headers on startup.
 
 ### Step 2: Start the IoT Server
-In **Terminal 1** — keep this running throughout:
+**Terminal 1** — keep this running throughout:
 ```bash
 python iot_server.py
 ```
 
 ### Step 3: Start the Dashboard
-In **Terminal 2** — open `http://localhost:5050` in your browser:
+**Terminal 2** — open `http://localhost:5050` in your browser:
 ```bash
 python dashboard.py
 ```
 
 ### Step 4: Generate Normal Traffic
-In **Terminal 3**:
+**Terminal 3** — let it run for a minute to build up baseline:
 ```bash
 python iot_client.py
 ```
-Let it run for a minute to build up normal traffic baseline, then Ctrl+C.
 
 ### Step 5: Simulate Attacks
-In **Terminal 3**:
+**Terminal 4** — watch the dashboard go live with detections:
 ```bash
 python attacker_sim.py --loop 30 --attack random
 ```
-Watch the dashboard go live with attack detections. You can also target a specific attack:
-```bash
-python attacker_sim.py --loop 10 --attack tls_heartbleed
-python attacker_sim.py --loop 10 --attack dtls_amp
-python attacker_sim.py --loop 10 --attack tls_poodle
-python attacker_sim.py --loop 10 --attack dtls_replay
-```
 
 ### Step 6: Train the Model
-Once enough data is collected:
+**Terminal 3** — stop the client (Ctrl+C), then retrain:
 ```bash
 python ml_anomaly_detector.py
 ```
-This will load `traffic_log.csv`, label the data, train the MLP, print accuracy/precision/recall, and save `anomaly_model.pkl`.
 
-### Step 7: Restart Server
-Restart `iot_server.py` to load the freshly trained model, then run the attacker again — the server will now classify all 4 attack types in real-time.
-
-### Step 8: Generate Threat Report
+### Step 7: Generate Threat Report
+**Terminal 3**:
 ```bash
 python threat_report.py
 ```
-Generates `threat_summary.txt` (human-readable) and `threat_report.csv` (machine-readable) in the project folder.
-
-## Dashboard Features
-- Live packet count, anomaly count, and attack rate
-- Donut chart — normal vs anomaly traffic ratio
-- Line chart — packets over time
-- Bar chart — breakdown by attack type
-- Live packet table with last 20 entries (auto-refreshes every 3 seconds)
+Generates `threat_summary.txt` and `threat_report.csv` in the project folder.
