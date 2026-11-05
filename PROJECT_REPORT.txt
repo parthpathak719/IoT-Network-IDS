@@ -4,10 +4,10 @@
 
 1. PROJECT OBJECTIVE
 --------------------------------------------------------------------------------
-The goal of this project is to develop a robust, real-time Security Monitoring 
-System for IoT devices. The system is designed to "memorize" normal network 
-traffic patterns and detect both known cyber-attacks and novel (Zero-Day) 
-anomalies using a Hybrid Deep Learning approach.
+The goal of this project is to demonstrate real-time security monitoring for
+simulated IoT traffic. A hybrid Isolation Forest and MLP model learns normal
+traffic patterns and classifies synthetic known attacks and unknown anomalies.
+This simulation does not establish detection of real attacks or zero-day exploits.
 
 2. SYSTEM ARCHITECTURE
 --------------------------------------------------------------------------------
@@ -15,16 +15,16 @@ The system is divided into three primary layers:
 
 A. SENSOR LAYER (Simulated IoT Devices):
    - Python-based simulators (iot_client.py) emulate legitimate IoT traffic.
-   - Attack simulators (attacker_sim.py) generate malicious traffic, including:
-     * TLS Heartbleed (Memory exhaustion simulation)
-     * TLS POODLE (Downgrade/Padding attack simulation)
-     * DTLS Amplification (DDoS simulation)
-     * DTLS Replay (Unauthorized command repetition)
-     * Novel Exfiltration (Large, randomized payloads to trigger "Unknown" alerts)
+   - Attack simulators (attacker_sim.py) generate synthetic payloads, including:
+     * TLS Heartbleed and POODLE labels (distinctive payload sizes)
+     * DTLS Amplification label (large UDP payload)
+     * DTLS Replay label (repeated UDP payloads)
+     * Exfiltration, malformed control, and random payload anomaly simulations
+   - These generators do not exploit protocol vulnerabilities.
 
 B. SERVER LAYER (IDS Engine):
    - A multi-protocol server (iot_server.py) that listens on TCP (TLS) and 
-     UDP (DTLS) ports.
+     UDP (simulated DTLS without encryption) ports.
    - Every incoming packet is analyzed in real-time by the ML/DL model before 
      being processed.
    - Real-time alerts are issued for any detected threat.
@@ -66,16 +66,23 @@ The project simulates a real-world environment using:
 3. Class Balancing: Because attacks are rare in real life, the training 
    pipeline uses oversampling (30x) to ensure the AI doesn't ignore the 
    malicious patterns.
+4. Evaluation: Labels come from payload size rules, and metrics are computed
+   on training data. They do not measure generalization to unseen traffic.
 
 5. HOW TO RUN THE PROJECT
 --------------------------------------------------------------------------------
-1. Start the Server:    python iot_server.py
-2. Start the Dashboard: python dashboard.py (View at http://localhost:5050)
-3. Run Normal Traffic:  python iot_client.py
-4. Run Attacks:         python attacker_sim.py
-5. Generate Report:     python threat_report.py
+1. Install dependencies and generate fresh local certificates (see README.md).
+2. Start the Server:    python iot_server.py
+3. Start the Dashboard: python dashboard.py (View at http://localhost:5050)
+4. Run Normal Traffic: python iot_client.py
+5. Collect each known attack class using attacker_sim.py (see README.md).
+6. Stop the client and server, then train: python ml_anomaly_detector.py
+7. Restart the server to load the model, then generate more traffic.
+8. Generate Report:     python threat_report.py
+
+Certificates, trained models, traffic logs, and generated threat reports are
+local artifacts excluded from Git. Earlier committed keys must not be trusted.
 
 ================================================================================
-Generated on: 2026-04-28
-Status: Fully Operational
+Status: Local educational simulation; see README.md for setup and limitations.
 ================================================================================

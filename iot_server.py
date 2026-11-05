@@ -83,9 +83,7 @@ def check_anomaly(payload_size, proc_time, time_diff):
 def log_traffic(protocol, payload_size, proc_time_ms, anomaly_score):
     with open(LOG_FILE, 'a', newline='') as f:
         writer = csv.writer(f)
-        # We write 7 columns to match the header:
-        # timestamp, protocol, payload_size, entropy, proc_time, anomaly_score, label
-        writer.writerow([time.time(), protocol, payload_size, 0.0, proc_time_ms, anomaly_score, anomaly_score])
+        writer.writerow([time.time(), protocol, payload_size, proc_time_ms, anomaly_score])
 
 # --- TLS SERVER (TCP) ---
 def handle_tls_client(conn, addr):
